@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<project name="DevTools" default="help" basedir=".">
+    <description>
+        Developer tools module
+    </description>
+	
+	<!-- Properties Definition -->
+	<property environment="env"/>
+	<dirname file="${ant.file}" property="module.dir"/>
+	<property name="build.properties" value="${module.dir}/build.properties"/>
+	<property file="${build.properties}"/>
+	
+	<!-- Task def -->	
+	<taskdef name="atg-ear"
+		classname="atg.appassembly.ant.CreateUnpackedEarTask"
+		classpath="${atg.ant.assembler.path}"/>
+	
+
+	<!-- Target Definition -->
+	
+	<target name="help" depends="-print-env">
+		<echo>Suggested Targets:</echo>
+		<echo>	clean</echo>
+		<echo>		- Deletes temp build files and uninstalls module from ATG</echo>
+		<echo></echo>
+		<echo>	compile</echo>
+		<echo>		- Compiles module classes</echo>
+		<echo></echo>
+		<echo>	install</echo>
+		<echo>		- Installs module into ATG directory</echo>
+		<echo></echo>
+		<echo>	ear</echo>
+		<echo>		- Assembles EAR in exploded mode (atg CreateUnpackedEarTask)</echo>
+		<echo></echo>
+		<echo>	quick-ear</echo>
+		<echo>		- compiles and replaces classes and config on server filesystem</echo>
+		<echo></echo>
+		<echo>	sync-content</echo>
+		<echo>		- copies new or modified files from src to server war dir</echo>
+		<echo></echo>
+		<echo>	server</echo>
+		<echo>		- Creates jboss instance server from default</echo>
+		<echo></echo>
+	</target>
+		
+	<target name="clean" depends="-clean-classes, uninstall">
+	</target>
+
+	<target name="compile" depends="-clean-classes, -print-env">
+		<echo>Compiling classes from ${src.dir}</echo>
+		<mkdir dir="${classes.dir}"/>
+        <javac srcdir="${src.dir}" destdir="${classes.dir}" debug="true" deprecation="false" includeantruntime="false" optimize="false" source="1.5" target="1.5" encoding="ISO-8859-1">
+            <classpath refid="dynamo.classpath" />
+            <classpath refid="module.classpath" />
+            <include name="**/*.java" />
+        </javac>
+		<!-- copy non source files as well -->
+		<copy todir="${classes.dir}">
+			<fileset dir="${src.dir}" excludes="**/*.java"/>
+		</copy>
+	</target>
+	
+	<target name="install" depends="uninstall, -print-env, compile, install-config, install-classes">
+		<echo>Installing module ${module.name}</echo>
+		<!-- Installing libs -->
+		<copy todir="${module.install.dir}/${lib.dir}" verbose="true">
+			<fileset dir="${module.dir}/${lib.dir}" includes="**/*.jar"/>
+		</copy>
+		
+		<!-- Def manifest classpath -->
+		<manifestclasspath property="manifest.clsspath" jarfile="${module.dir}/${lib.dir}">
+			<classpath refid="module.classpath"/>
+		</manifestclasspath>
+		
+		<!-- Installing manifest -->
+		<copy todir="${module.install.dir}/${manifest.dir}" file="${module.dir}/${manifest.dir}/MANIFEST.MF">
+			<filterset begintoken="{" endtoken="}">
+				<filtersfile file="${build.properties}"/>
+				<filter token="module.classpath" value="${classes.jar} ${manifest.clsspath}"/>
+			</filterset>
+		</copy>
+		
+		<!-- Installing j2ee -->
+		<copy todir="${module.install.dir}/${j2ee.dir}" failonerror="false">
+			<fileset dir="${module.dir}/${j2ee.dir}" includes="**"/>
+		</copy>
+
+		<!-- Installing sql -->
+		<copy todir="${module.install.dir}/${sql.dir}" failonerror="false">
+			<fileset dir="${module.dir}/${sql.dir}" includes="**/*.sql"/>
+		</copy>
+	</target>
+
+	<!-- assemble ear file -->
+	<target name="ear" depends="-print-env, clean-ear, install">
+		<echo>assembling ear ${server.ear.path}</echo>
+		<atg-ear dynamoRoot="${atg.dir}"
+			destinationFile="${server.ear.path}"
+			displayName="${module.name}"
+			dynamoModules="${ear.modules}"
+			liveConfig="${ear.liveConfig}"
+			standalone="${ear.standalone}"
+			overwrite="true" />
+	</target>
+	
+	<!-- create server env -->
+	<target name="server" depends="-print-env, clean-server">
+		<echo>Copying jboss server from default: ${jboss.default.server} -> ${server.name}</echo>
+		<copy todir="${server.path}" verbose="false">
+			<fileset dir="${jboss.default.server.path}" includes="**"/>
+		</copy>
+	</target>
+	
+	<target name="all" depends="clean, compile, install, ear">
+	</target>
+	
+	<target name="-clean-classes" depends="-print-env">
+		<echo>Deleteing: ${classes.dir}</echo>
+		<delete dir="${classes.dir}" verbose="true"/>
+	</target>
+
+	<target name="clean-server">
+		<echo>Deleteing: ${server.path}</echo>
+		<delete dir="${server.path}" verbose="false"/>
+	</target>
+	
+	<target name="clean-ear" depends="-print-env">
+		<echo>deleteing ${server.ear.path}</echo>
+		<delete dir="${server.ear.path}" verbose="false"/>
+	</target>
+	
+	<target name="install-config">
+		<!-- Installing config -->
+		<echo>Installing config ${module.install.dir}/${config.jar}</echo>
+		<jar destfile="${module.install.dir}/${config.jar}" basedir="${module.dir}/${config.dir}" includes="**"/>
+	</target>
+
+	<target name="install-classes" depends="compile">
+		<!-- Installing classes -->
+		<jar destfile="${module.install.dir}/${classes.jar}" basedir="${classes.dir}" includes="**"/>
+	</target>
+	
+	<target name="quick-classes" depends="install-classes">
+		<echo> Replacing ${server.atglib.classes.jar} </echo>
+		<copy file="${module.install.dir}/${classes.jar}" tofile="${server.atglib.classes.jar}" overwrite="true"/>
+	</target>
+	
+	<target name="sync-content">
+		<echo> Sync content to ${server.ear.path}/${war.name}</echo>
+		<copy todir="${server.ear.path}/${war.name}" verbose="true">
+			<fileset dir="${module.dir}/${j2ee.dir}/${war.name}" includes="**/*">
+				<modified/>
+			</fileset>
+		</copy>	
+	</target>
+	
+	
+	<target name="quick-ear" depends="quick-classes, install-config, sync-content"/>
+	
+	<target name="-print-env">
+		<echo>-----------------[ Environment ]------------------------------</echo>
+		<echo>DYNAMO_HOME: ${dynamo.home}</echo>
+		<echo>JBOSS Home:  ${jboss.dir}</echo>
+		<echo>Module Name: ${module.name}</echo>
+		<echo>Module Home: ${module.dir}</echo>
+		<echo>EAR deployed: ${server.ear.path}</echo>
+		<echo>--------------------------------------------------------------</echo>
+	</target>
+	
+	<target name="uninstall">
+		<echo>Uninstalling module ${module.name}</echo>
+		<delete dir="${module.install.dir}"/>
+	</target>
+	
+	<path id="dynamo.classpath">
+		<fileset dir="${atg.dir}/DAS/lib" includes="**/*.jar"/>
+		<fileset dir="${atg.dir}/DPS/lib" includes="**/*.jar"/>
+		<fileset dir="${atg.dir}/DSS/lib" includes="**/*.jar"/>
+		<fileset dir="${atg.dir}/DCS/lib" includes="**/*.jar"/>
+	</path>
+	
+	<path id="module.classpath">
+		<fileset dir="${module.dir}/${lib.dir}" includes="**/*.jar"/>
+	</path>
+</project>

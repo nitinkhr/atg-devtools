@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://java.sun.com/xml/ns/javaee 
+              http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd"
+	version="2.5" xmlns="http://java.sun.com/xml/ns/javaee">
+
+	<!-- Default page to serve -->
+	<welcome-file-list>
+		<welcome-file>UI.html</welcome-file>
+	</welcome-file-list>
+
+	<servlet>
+		<servlet-name>JettyProxy</servlet-name>
+		<servlet-class>org.mortbay.servlet.ProxyServlet$Transparent</servlet-class>
+		<init-param>
+			<param-name>ProxyTo</param-name>
+			<param-value>http://localhost</param-value>
+		</init-param>
+		<!-- <init-param> <param-name>Prefix</param-name> will be removed from 
+			request <param-value>/prefix/</param-value> </init-param> -->
+		<load-on-startup>1</load-on-startup>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>JettyProxy</servlet-name>
+		<url-pattern>/devtools/*</url-pattern>
+	</servlet-mapping>
+
+</web-app>

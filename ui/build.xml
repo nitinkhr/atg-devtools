@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<project name="UI" default="-print-env" basedir=".">
+
+	<description>
+        Developer tools module UI
+    </description>
+
+	<!-- Properties Definition -->
+	<property environment="env"/>
+	<property file="${basedir}/build.properties"/>
+	<property file="${module.dir}/build.properties"/>
+	<property name="src.dir" location="${src.dir}"/>
+
+	<taskdef name="groovyc" classname="org.codehaus.groovy.ant.Groovyc">
+		<classpath>
+			<path>
+				<fileset dir="${groovy.home}/lib" includes="**/*.jar"/>
+			</path>
+		</classpath>
+	</taskdef>
+
+	<path id="build.class.path">
+		<fileset dir="${basedir}/${war.name}/WEB-INF/lib" includes="**/*.jar"/>
+		<fileset dir="${gwt.sdk}" includes="**/*.jar"/>
+		<fileset dir="${smartgvt.home}" includes="**/*.jar"/>
+	</path>
+
+	<target name="compile" depends="-print-env, clean-classes" description="Compile java source to bytecode">
+		<mkdir dir="${classes.dir}"/>
+		<groovyc srcdir="${src.dir}" includes="**" encoding="ISO-8859-1"
+        destdir="${classes.dir}"
+    	verbose="true">
+			<classpath refid="build.class.path"/>
+			<javac source="1.6" target="1.6" debug="on"/>
+		</groovyc>
+		<!-- copy non source files as well -->
+		<copy todir="${classes.dir}">
+			<fileset dir="${src.dir}" excludes="**/*.java,**/*.groovy"/>
+		</copy>
+	</target>
+
+	<target name="clean-classes" depends="-print-env">
+		<echo>Deleteing: ${classes.dir}</echo>
+		<delete dir="${classes.dir}" verbose="true"/>
+	</target>
+
+	<target name="gwtc" depends="-print-env, compile" description="GWT compile to JavaScript (production mode)">
+		<java failonerror="true" fork="true" classname="com.google.gwt.dev.Compiler">
+			<classpath>
+				<pathelement location="${src.dir}"/>
+				<path refid="build.class.path"/>
+			</classpath>
+			<!-- add jvmarg -Xss16M or similar if you see a StackOverflowError -->
+			<jvmarg value="-Xmx256M"/>
+			<arg line="-war"/>
+			<arg value="${war.name}"/>
+			<!-- Additional arguments like -style PRETTY or -logLevel DEBUG -->
+			<arg line="${gwt.args}"/>
+			<arg value="${entry-point.descriptor}"/>
+		</java>
+	</target>
+
+	<target name="devmode" depends="-print-env, compile" description="Run development mode">
+		<java failonerror="true" fork="true" classname="com.google.gwt.dev.DevMode">
+			<classpath>
+				<pathelement location="${src.dir}"/>
+				<path refid="build.class.path"/>
+			</classpath>
+			<jvmarg value="-Xmx256M"/>
+			<arg value="-startupUrl"/>
+			<arg value="${entry-point.html}"/>
+			<arg line="-war"/>
+			<arg value="${war.name}"/>
+			<!-- Additional arguments like -style PRETTY or -logLevel DEBUG -->
+			<arg line="${gwt.args}"/>
+			<arg value="${entry-point.descriptor}"/>
+		</java>
+	</target>
+
+	<target name="build" depends="gwtc" description="Build this project" />
+
+	<target name="war" depends="build" description="Create a war file">
+		<zip destfile="UI.war" basedir="war"/>
+	</target>
+
+	<target name="-print-env">
+		<echo>-----------------[ ${module.name} ${ant.project.name} ]------------------------------</echo>
+		<echo>DYNAMO_HOME: ${dynamo.home}</echo>
+		<echo>JBOSS Home:  ${jboss.dir}</echo>
+		<echo>Module Name: ${module.name}</echo>
+		<echo>Module Home: ${module.dir}</echo>
+		<echo>GWT home   : ${gwt.sdk}</echo>
+		<echo>SmartGWT home: ${smartgwt.home}</echo>
+		<echo>Groovy home: ${groovy.home}</echo>
+		<echo>--------------------------------------------------------------</echo>
+	</target>
+
+</project>
